@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>印章提取 — Extract Stamp</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23e5484d' d='M9 2h6a2 2 0 0 1 2 2v5H7V4a2 2 0 0 1 2-2m-3 9h12l1 4H5zm-3 6h18v3H3z'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --border: #e3e6ea;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #e5484d;
+    --accent-dark: #c93b40;
+    --ok: #2f9e44;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+  header h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: .3px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; margin-top: 18px;
+  }
+  #drop {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 40px 20px;
+    text-align: center; cursor: pointer; transition: .15s; background: #fcfcfd;
+  }
+  #drop:hover, #drop.over { border-color: var(--accent); background: #fff5f5; }
+  #drop strong { color: var(--accent); }
+  #drop .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 20px; }
+  .opt label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .opt select, .opt input[type=number] {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: #fff; font-size: 13px; color: var(--text);
+  }
+  .opt input[type=range] { width: 100%; accent-color: var(--accent); }
+  .opt .row { display: flex; align-items: center; gap: 8px; }
+  .opt .val { font-variant-numeric: tabular-nums; color: var(--text); min-width: 26px; text-align: right; font-size: 12px; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+  .check input { accent-color: var(--accent); width: 15px; height: 15px; }
+  button {
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    border-radius: 8px; padding: 9px 16px; font-size: 13px; cursor: pointer; transition: .15s;
+  }
+  button:hover:not(:disabled) { border-color: #c9ced6; background: #fafbfc; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; }
+  .status { color: var(--muted); font-size: 13px; margin-left: auto; }
+  .status.err { color: var(--accent); }
+  .status.ok { color: var(--ok); }
+  .previews { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 6px; }
+  @media (max-width: 720px) { .previews { grid-template-columns: 1fr; } }
+  .prev h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .prev img { width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; background: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+  .card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; }
+  .card .thumb {
+    height: 150px; display: flex; align-items: center; justify-content: center; padding: 10px;
+    background-color: #fff;
+    background-image:
+      linear-gradient(45deg, #eef1f4 25%, transparent 25%, transparent 75%, #eef1f4 75%),
+      linear-gradient(45deg, #eef1f4 25%, transparent 25%, transparent 75%, #eef1f4 75%);
+    background-size: 16px 16px; background-position: 0 0, 8px 8px;
+  }
+  .card .thumb img { max-width: 100%; max-height: 130px; object-fit: contain; }
+  .card .meta { padding: 8px 10px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card .meta span { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .card .meta a {
+    font-size: 12px; color: var(--accent); text-decoration: none; border: 1px solid var(--accent);
+    border-radius: 6px; padding: 3px 9px; white-space: nowrap;
+  }
+  .card .meta a:hover { background: var(--accent); color: #fff; }
+  .empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 14px; line-height: 1.7; }
+  .boot { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  .spin { width: 13px; height: 13px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: sp .8s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>印章提取</h1>
+    <p>从照片里抠出红色 / 蓝色印章，输出透明背景 PNG。全部在本地浏览器完成，图片不上传任何服务器。</p>
+  </header>
+
+  <div class="panel">
+    <div id="drop">
+      <div>把图片拖到这里，或 <strong>点击选择</strong></div>
+      <div class="hint">支持 JPG / PNG / WebP / BMP；建议使用印章清晰、底色较浅的原图</div>
+      <input type="file" id="file" accept="image/*" class="hidden">
+    </div>
+
+    <div class="opts hidden" id="opts" style="margin-top:18px">
+      <div class="opt">
+        <label for="color">印章颜色</label>
+        <select id="color">
+          <option value="red" selected>红色印章</option>
+          <option value="blue">蓝色印章</option>
+        </select>
+      </div>
+      <div class="opt">
+        <label for="tol">颜色容差 <span class="val" id="tolVal">5</span></label>
+        <div class="row">
+          <input type="range" id="tol" min="1" max="10" step="1" value="5">
+        </div>
+      </div>
+      <div class="opt">
+        <label>输出内容</label>
+        <div class="row">
+          <select id="mode" style="flex:1">
+            <option value="original" selected>保留印章原色</option>
+            <option value="color">统一填充指定颜色</option>
+          </select>
+          <input type="color" id="outColor" value="#ff0000" title="统一填充的颜色"
+                 style="width:38px;height:34px;padding:2px;border:1px solid var(--border);border-radius:7px;background:#fff">
+        </div>
+      </div>
+      <div class="opt">
+        <label for="cth">圆形检出灵敏度 <span class="val" id="cthVal">45</span></label>
+        <div class="row"><input type="range" id="cth" min="8" max="80" step="1" value="45"></div>
+      </div>
+      <div class="opt" style="display:flex;align-items:flex-end">
+        <div class="check">
+          <input type="checkbox" id="circleOnly">
+          <label for="circleOnly" style="margin:0;color:var(--text);font-size:13px">只提取圆形印章</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions hidden" id="actions">
+      <button class="primary" id="run">开始提取</button>
+      <button id="reset">换一张</button>
+      <button id="dlAll" class="hidden">下载全部</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="result">
+    <div class="previews">
+      <div class="prev">
+        <h3>原图（红框为检出的印章）</h3>
+        <img id="overlayImg" alt="原图与检测框">
+      </div>
+      <div class="prev">
+        <h3>提取结果</h3>
+        <div id="stampWrap"><div class="grid" id="grid"></div><div class="empty hidden" id="noStamp"></div></div>
+      </div>
+    </div>
+    <div class="note" id="stat"></div>
+  </div>
+
+  <div class="note boot" id="boot"><span class="spin"></span><span>正在加载 OpenCV.js（约 10MB，首次需要几秒；加载后本页可离线使用）…</span></div>
+
+  <div class="note">
+    算法：HSV 双区间颜色掩码取印章 → 形态学闭运算连通笔画 → 淡边回补（把被冲淡的外缘接回来）→ 定位（圆形模式用 HoughCircles 只判"这团是不是圆的"，裁剪范围一律取连通域真实外接框；非圆形模式直接取连通域）→ 细长图形（箭头/下划线）按最小外接矩形长短边比排除 → 按掩码生成透明通道并紧致裁剪。
+    思路参考上游 <a href="https://github.com/xxss0903/extractstamp" target="_blank" rel="noopener noreferrer">xxss0903/extractstamp</a>，本页为其在 IT-Tools 中的集成实现（OpenCV.js 已本地化，无任何外部依赖）。
+  </div>
+</div>
+
+<script src="./opencv.js"></script>
+<script src="./extractstamp.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { img: null, stamps: [], busy: false };
+
+  // ---- 控件联动 ----
+  $('tol').addEventListener('input', function () { $('tolVal').textContent = this.value; });
+  $('cth').addEventListener('input', function () { $('cthVal').textContent = this.value; });
+  $('mode').addEventListener('change', function () {
+    $('outColor').style.display = this.value === 'color' ? '' : 'none';
+  });
+  $('outColor').style.display = 'none';
+
+  // ---- 选图（点击 / 拖拽 / 粘贴）----
+  var drop = $('drop');
+  drop.addEventListener('click', function () { $('file').click(); });
+  $('file').addEventListener('change', function () {
+    if (this.files && this.files[0]) accept(this.files[0]);
+  });
+  ['dragenter', 'dragover'].forEach(function (e) {
+    drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (e) {
+    drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function (ev) {
+    var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) accept(f);
+  });
+  window.addEventListener('paste', function (ev) {
+    var items = ev.clipboardData && ev.clipboardData.files;
+    if (items && items[0]) accept(items[0]);
+  });
+
+  function setStatus(text, cls) {
+    var el = $('status');
+    el.textContent = text || '';
+    el.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function accept(file) {
+    if (!/^image\//.test(file.type)) { setStatus('请选择图片文件', 'err'); return; }
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      state.img = img;
+      URL.revokeObjectURL(url);
+      $('opts').classList.remove('hidden');
+      $('actions').classList.remove('hidden');
+      $('drop').classList.add('hidden');
+      setStatus('已选择：' + file.name + '（' + img.naturalWidth + '×' + img.naturalHeight + '）');
+      run();
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      setStatus('这个文件无法解码为图片', 'err');
+    };
+    img.src = url;
+  }
+
+  function reset() {
+    state.img = null;
+    state.stamps = [];
+    $('opts').classList.add('hidden');
+    $('actions').classList.add('hidden');
+    $('result').classList.add('hidden');
+    $('drop').classList.remove('hidden');
+    $('file').value = '';
+    $('dlAll').classList.add('hidden');
+    setStatus('');
+  }
+  $('reset').addEventListener('click', reset);
+
+  // ---- 提取 ----
+  function run() {
+    if (!state.img || state.busy) return;
+    state.busy = true;
+    $('run').disabled = true;
+    setStatus('处理中…');
+    var t0 = Date.now();
+
+    ExtractStamp.extractStamps(state.img, {
+      color: $('color').value,
+      tolerance: +$('tol').value,
+      circleOnly: $('circleOnly').checked,
+      circleThreshold: +$('cth').value,
+      mode: $('mode').value,
+      outColor: $('outColor').value,
+    }).then(function (res) {
+      var secs = ((Date.now() - t0) / 1000).toFixed(2);
+      state.stamps = res.stamps;
+      $('overlayImg').src = res.overlay;
+      $('result').classList.remove('hidden');
+      render(res);
+      $('stat').textContent = '原图 ' + res.width + '×' + res.height +
+        ' · 颜色像素 ' + res.maskPixels.toLocaleString() +
+        ' · 检出 ' + res.stamps.length + ' 枚' +
+        (res.circle ? '（圆形模式）' : '') + ' · 耗时 ' + secs + 's';
+      if (res.stamps.length) {
+        setStatus('完成，检出 ' + res.stamps.length + ' 枚印章', 'ok');
+        $('dlAll').classList.remove('hidden');
+      } else {
+        setStatus('没有检出印章：可调高「颜色容差」再试，或确认印章颜色是否选对', 'err');
+        $('dlAll').classList.add('hidden');
+      }
+    }).catch(function (e) {
+      console.error(e);
+      setStatus('失败：' + (e && e.message ? e.message : e), 'err');
+    }).then(function () {
+      state.busy = false;
+      $('run').disabled = false;
+    });
+  }
+  $('run').addEventListener('click', run);
+
+  function render(res) {
+    var grid = $('grid');
+    grid.innerHTML = '';
+    var none = $('noStamp');
+    if (!res.stamps.length) {
+      none.classList.remove('hidden');
+      none.textContent = res.empty
+        ? '这张图里没有检测到所选颜色的像素，换一种颜色或提高容差试试。'
+        : '有颜色像素，但没有形成可提取的印章区域，试试提高容差或关闭「只提取圆形印章」。';
+      return;
+    }
+    none.classList.add('hidden');
+    res.stamps.forEach(function (s, i) {
+      var card = document.createElement('div');
+      card.className = 'card';
+      var thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      var im = document.createElement('img');
+      im.src = s.dataUrl;
+      im.alt = '印章 ' + (i + 1);
+      thumb.appendChild(im);
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var info = document.createElement('span');
+      info.textContent = s.width + '×' + s.height + ' · ' + (s.circle ? '圆形' : '区域');
+      var a = document.createElement('a');
+      a.href = s.dataUrl;
+      a.download = 'stamp-' + (i + 1) + '.png';
+      a.textContent = '下载';
+      meta.appendChild(info);
+      meta.appendChild(a);
+      card.appendChild(thumb);
+      card.appendChild(meta);
+      grid.appendChild(card);
+    });
+  }
+
+  $('dlAll').addEventListener('click', function () {
+    state.stamps.forEach(function (s, i) {
+      setTimeout(function () {
+        var a = document.createElement('a');
+        a.href = s.dataUrl;
+        a.download = 'stamp-' + (i + 1) + '.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }, i * 220);
+    });
+    setStatus('已开始逐个下载 ' + state.stamps.length + ' 张', 'ok');
+  });
+
+  // ---- 等待 OpenCV.js 就绪（真正等到 cv.Mat 可用）----
+  ExtractStamp.loadOpenCV().then(function () {
+    $('boot').classList.add('hidden');
+  }).catch(function (e) {
+    $('boot').innerHTML = '<span style="color:var(--accent)">OpenCV.js 加载失败：' +
+      (e && e.message ? e.message : e) + '。请刷新重试。</span>';
+  });
+})();
+</script>
+</body>
+</html>

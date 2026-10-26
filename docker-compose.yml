@@ -1,0 +1,14 @@
+services:
+  extractstamp:
+    image: ghcr.io/boater-man/extractstamp:latest
+    build: .
+    container_name: extractstamp
+    restart: unless-stopped
+    ports:
+      - "8848:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
